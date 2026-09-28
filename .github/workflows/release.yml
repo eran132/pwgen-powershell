@@ -1,0 +1,84 @@
+name: release
+
+# Push a tag like v1.2.0 whose number matches ModuleVersion in PwGen/PwGen.psd1.
+# The workflow runs the tests, publishes to the PowerShell Gallery (if the
+# PSGALLERY_API_KEY secret is set) and creates the GitHub release.
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check tag matches module version
+        id: version
+        run: |
+          $version = (Import-PowerShellDataFile ./PwGen/PwGen.psd1).ModuleVersion
+          $tag = '${{ github.ref_name }}'
+          if ($tag -ne "v$version") {
+            throw "Tag '$tag' does not match ModuleVersion '$version' in PwGen/PwGen.psd1"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $lines = Get-Content ./CHANGELOG.md
+          $start = ($lines | Select-String -Pattern "^## $([regex]::Escape($version))\b").LineNumber
+          if (-not $start) { throw "CHANGELOG.md has no '## $version' section" }
+          $notes = foreach ($line in $lines[$start..($lines.Count - 1)]) {
+            if ($line -match '^## ') { break }
+            $line
+          }
+          $notes += @('', '**Install:** `Install-Module PwGen -Scope CurrentUser`')
+          ($notes -join "`n").Trim() | Set-Content ./release-notes.md
+
+      - name: Build packages
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          Install-PSResource Microsoft.PowerShell.PSResourceGet -Version '[1.1.0,)' -TrustRepository -Scope CurrentUser -Quiet
+          Import-Module Microsoft.PowerShell.PSResourceGet -MinimumVersion 1.1.0 -Force
+          New-Item -ItemType Directory ./out | Out-Null
+          Compress-PSResource -Path ./PwGen -DestinationPath ./out
+          Compress-Archive -Path ./PwGen -DestinationPath "./out/PwGen-$version.zip"
+          Get-ChildItem ./out | Format-Table Name, Length
+
+      - name: Publish to PowerShell Gallery
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          if (-not $env:PSGALLERY_API_KEY) {
+            "::warning::PSGALLERY_API_KEY secret is not set; skipping PowerShell Gallery publish."
+            return
+          }
+          if (Find-PSResource PwGen -Version $version -Repository PSGallery -ErrorAction SilentlyContinue) {
+            "PwGen $version is already on the PowerShell Gallery; skipping."
+            return
+          }
+          Publish-PSResource -Path ./PwGen -Repository PSGallery -ApiKey $env:PSGALLERY_API_KEY
+          "Published PwGen $version to the PowerShell Gallery."
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          gh release create '${{ github.ref_name }}' ./out/* `
+            --title "PwGen $version" `
+            --notes-file ./release-notes.md `
+            --verify-tag
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

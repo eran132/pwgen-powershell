@@ -78,6 +78,17 @@ Invoke-Pester ./tests
 
 GitHub Actions runs the tests on Windows PowerShell 5.1, PowerShell 7 on Windows, and PowerShell 7 on Linux.
 
+### Releasing
+
+1. Bump `ModuleVersion` in `PwGen/PwGen.psd1` and add a matching `## <version>` section to `CHANGELOG.md`.
+2. Commit, then tag and push:
+   ```
+   git tag v1.2.0
+   git push origin main --tags
+   ```
+
+The [release workflow](.github/workflows/release.yml) runs the tests, publishes to the PowerShell Gallery using the `PSGALLERY_API_KEY` repository secret, and creates a GitHub release with the `.zip` and `.nupkg` attached.
+
 ## Credits and licence
 
 Based on [pwgen](https://github.com/tytso/pwgen), Copyright (C) 2001–2014 Theodore Ts'o.
