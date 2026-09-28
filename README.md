@@ -1,5 +1,10 @@
 # PwGen for PowerShell
 
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/PwGen?label=PowerShell%20Gallery)](https://www.powershellgallery.com/packages/PwGen)
+[![Downloads](https://img.shields.io/powershellgallery/dt/PwGen?label=downloads)](https://www.powershellgallery.com/packages/PwGen)
+[![test](https://github.com/eran132/pwgen-powershell/actions/workflows/test.yml/badge.svg)](https://github.com/eran132/pwgen-powershell/actions/workflows/test.yml)
+[![License: GPL-2.0](https://img.shields.io/github/license/eran132/pwgen-powershell)](LICENSE)
+
 A PowerShell port of [pwgen](https://github.com/tytso/pwgen), the password generator that ships with most Linux distributions.
 
 It takes the same options as `pwgen` and uses the same method for easy-to-say passwords, so commands you know from Linux work unchanged on Windows.
